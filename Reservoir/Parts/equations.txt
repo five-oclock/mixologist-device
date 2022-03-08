@@ -1,0 +1,4 @@
+﻿"Reservoir Capacity"= 750'mL
+"Reservoir Height"= 8 * 2.54'cm
+"Reservoir Radius"= "Reservoir Capacity" / "Reservoir Height" / ( PI ^ 2 )'cm
+"Reservoir Thickness"= 0.25'cm

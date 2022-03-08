@@ -1,0 +1,10 @@
+﻿"[R][Body] Capacity"= 750'mL
+"[R][Body] Height"= 8 * 2.54'cm
+"[R][Body] Radius"= "[R][Body] Capacity" / "[R][Body] Height" / ( PI ^ 2 )'cm
+"[R][Body] Thickness"= 0.25'cm
+"[TOL] Sliding"= 0.5mm
+"[R][Slider] Height"= 1
+"[R][Slider] Shell Thickness" = 2mm
+"[R][Bottom] Height"= 2
+"[R][Bottom] Reservoir Height"= "[R][Slider] Height" + 0.5cm
+"[R][Bottom] Width" = 1
