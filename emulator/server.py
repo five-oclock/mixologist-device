@@ -30,20 +30,24 @@ def fill_reservoir(res, amount):
     if not 0 <= res < machine.num_res:
         logging.info("No valid reservoir with id %s", res)
     else:
-        if machine.get_res(res).quantity + amount > machine.max:
-            amount = machine.max - machine.get_res(res).quantity
+        logging.info(cache.get('state').decode('utf-8'))
+
+        #if machine.get_res(res).quantity + amount > machine.max:
+            #amount = machine.max - machine.get_res(res).quantity
         
-        machine.fill(res, amount)
-        logging.info("Filled reservoir %s with %s ozs", res, amount)
+        #machine.fill(res, amount)
+        #logging.info("Filled reservoir %s with %s ozs", res, amount)
 
 @app.cli.command('change')
 @click.argument("res")
 @click.argument("ingredient")
-def change_liqure(res, ingredient):
+def change_liqure(res, ingredient, amount):
     if not 0 <= res < machine.num_res:
         logging.info("No valid reservoir with id %s", res)
     else:
-        machine.change_ingredient(res, ingredient)
+        cache.set('res', res)
+        cache.set('ingredient', ingredient)
+
 
 
 ############################################################################
@@ -57,41 +61,45 @@ def startup():
     for i in range(machine.num_res):
         machine.set_res_properties(i, i, machine.max)
     
-    cache.set('state', json.loads({inv: machine.dump_state}))
+    state = machine.dump_state()
+    cache.set('state', json.dumps({'inv': state}))
+    cache.set('c_update_flag', 0)
 
-@app.route('/api/v1/make-recipe', methods = ['POST'])
+@app.route('/api/v1/make-recipe/', methods = ['POST'])
 def app_make_drink():
-    user = request.args.get('user')
-    app.logger.info('Drink request received from user %s', user)
+    #f = request.form['user']
+    #user = request.form.get('user')
+    #app.logger.info('Drink request received from user %s', user)
 
-    loc = machine.add_drink()
+    #loc = machine.add_drink()
 
-    if loc == -1:
-        return json.dumps({'location': -1})
+    #if loc == -1:
+        #return json.dumps({'location': -1})
     
-    recipe = json.loads(request.args.get('recipe'))
+    #recipe = json.loads(request.form.get('recipe'))
 
-    all_ingredients = True
-    for r in recipe:
-        exists = False
-        for i in range(machine.num_res):
-            if machine.get_res(i).ingredient == r['ingredient-id']:
-                if machine.get_res(i).quantity >= r['amount']:
-                    exists = True
-        all_ingredients = all_ingredients and exists
+    #all_ingredients = True
+    #for r in recipe:
+        #exists = False
+        #for i in range(machine.num_res):
+            #if machine.get_res(i).ingredient == r['ingredient-id']:
+                #if machine.get_res(i).quantity >= r['amount']:
+                    #exists = True
+        #all_ingredients = all_ingredients and exists
 
-    if not all_ingredients:
-        return json.dumps({'location': -2})
+    #if not all_ingredients:
+        #return json.dumps({'location': -2})
 
-    for r in recipe:
-        for i in range(machine.num_res):
-            if machine.get_res(i).ingredient == r['ingredient-id']:
-                machine.pour(i, r['amount'])
+    #for r in recipe:
+        #for i in range(machine.num_res):
+            #if machine.get_res(i).ingredient == r['ingredient-id']:
+                #machine.pour(i, r['amount'])
 
-    machine.set_thread(loc, Job(loc, 20, app))
-    cache.set('state', json.loads({'inv': machine.dump_state}))
+    #machine.set_thread(loc, Job(loc, 20, app))
+    #state = machine.dump_state()
+    #cache.set('state', json.dumps({'inv': state}))
 
-    response = {'200': {'location': loc}}
+    response = {'200': {'location': 0}}
     return json.dumps(response)
 
 @app.route('/api/v1/location', methods = ['GET'])

@@ -1,6 +1,5 @@
 from threading import Thread
 import time
-import json
 
 format = '[%(asctime)s]: %(message)s'
 
