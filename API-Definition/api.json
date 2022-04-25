@@ -1,0 +1,74 @@
+[
+    {
+        "name": "Make a Drink",
+        "endpoint": "/api/v1/make-recipe",
+        "method": "POST",
+        "model": {
+            "recipe": [
+                {
+                    "ingredient-id": 1,
+                    "amount": 1,
+                    "units": "oz"
+                },
+                {
+                    "ingredient-id": 2,
+                    "amount": 5,
+                    "units": "oz"
+                }
+            ],
+            "ice": true,
+            "mix": "stirred",
+            "user": "user-id"
+        },
+        "response": {
+            "200": {
+                "location": 1 // The location in the staging area
+            }
+        }
+    },
+    {
+        "name":"Get Drink Status",
+        "endpoint": "/api/v1/location",
+        "method": "GET",
+        "model": {
+			"Location Number": <LOCATION_NUMBER>
+		},
+        "response": {
+            "200": {
+                "status": "open | making | done",
+                "progress": 0.5
+            }
+        }
+    },
+    {
+        "name": "Get Inventory",
+        "endpoint": "/api/v1/inventory",
+        "method": "GET",
+        "model": null,
+        "response": {
+            "inventory": [
+                {
+                    "reservoir": 1,
+                    "ingredient-id": 1,
+                    "quatity": 150,
+                    "units": "oz"
+                },
+                ...
+            ],
+        }
+    },
+    {
+        "name": "Update Inventory",
+        "endpoint": "/api/v1/inventory/update",
+        "method": "POST",
+        "model": {
+			"reservoir-number": <RESERVOIR NUMBER>,
+            "ingredient-id": 1,
+            "quantity": 150,
+            "units": "oz"
+        },
+        "response": {
+            "200": null
+        }
+    }
+]
