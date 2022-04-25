@@ -61,7 +61,8 @@ def startup():
 
 @app.route('/api/v1/make-recipe', methods = ['POST'])
 def app_make_drink():
-    user = request.args.get('user')
+    req = request.json
+    user = req['user']
     app.logger.info('Drink request received from user %s', user)
 
     loc = machine.add_drink()
@@ -69,7 +70,7 @@ def app_make_drink():
     if loc == -1:
         return json.dumps({'location': -1})
     
-    recipe = json.loads(request.args.get('recipe'))
+    recipe = req['recipe']
 
     all_ingredients = True
     for r in recipe:
@@ -81,6 +82,7 @@ def app_make_drink():
         all_ingredients = all_ingredients and exists
 
     if not all_ingredients:
+        print(machine.dump_state())
         return json.dumps({'location': -2})
 
     for r in recipe:
@@ -89,9 +91,10 @@ def app_make_drink():
                 machine.pour(i, r['amount'])
 
     machine.set_thread(loc, Job(loc, 20, app))
-    cache.set('state', json.loads({'inv': machine.dump_state}))
+    state = machine.dump_state()
+    cache.set('state', json.dumps({'inv': state}))
 
-    response = {'200': {'location': loc}}
+    response = {'200': {'location': 0}}
     return json.dumps(response)
 
 @app.route('/api/v1/location', methods = ['GET'])
