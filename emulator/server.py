@@ -1,49 +1,15 @@
 from flask import Flask, request
-from pymemcache.client import base
 from mixologist import Mixologist, Job
-import click
 import logging
 import json
 
 app = Flask(__name__)
 
 
-cache = base.Client(('localhost', 11211))
-
-machine = Mixologist(12, 12, cache)
+machine = Mixologist(12, 12)
 
 format = "[%(asctime)s]: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO, datefmt='%H:%M:%S')
-
-############################################################################
-#CLI Definition
-############################################################################
-@app.cli.command('state')
-def list_locations():
-    #logging.info(machine.dump_state())
-    logging.info('Current State: %s', ''.join(str(cache.get('loc' + str(i))) for i in range(machine.num_loc)))
-
-@app.cli.command('fill')
-@click.argument("res")
-@click.argument("amount")
-def fill_reservoir(res, amount):
-    if not 0 <= res < machine.num_res:
-        logging.info("No valid reservoir with id %s", res)
-    else:
-        if machine.get_res(res).quantity + amount > machine.max:
-            amount = machine.max - machine.get_res(res).quantity
-        
-        machine.fill(res, amount)
-        logging.info("Filled reservoir %s with %s ozs", res, amount)
-
-@app.cli.command('change')
-@click.argument("res")
-@click.argument("ingredient")
-def change_liqure(res, ingredient):
-    if not 0 <= res < machine.num_res:
-        logging.info("No valid reservoir with id %s", res)
-    else:
-        machine.change_ingredient(res, ingredient)
 
 
 ############################################################################
@@ -51,13 +17,9 @@ def change_liqure(res, ingredient):
 ############################################################################
 @app.before_first_request
 def startup():
-    for i in range(machine.num_loc):
-        cache.set('loc' + str(i), 0)
-
     for i in range(machine.num_res):
         machine.set_res_properties(i, i, machine.max)
     
-    cache.set('state', json.loads({inv: machine.dump_state}))
 
 @app.route('/api/v1/make-recipe', methods = ['POST'])
 def app_make_drink():
@@ -89,7 +51,6 @@ def app_make_drink():
                 machine.pour(i, r['amount'])
 
     machine.set_thread(loc, Job(loc, 20, app))
-    cache.set('state', json.loads({'inv': machine.dump_state}))
 
     response = {'200': {'location': loc}}
     return json.dumps(response)
@@ -114,7 +75,6 @@ def app_get_status():
     else:
         status = 'open'
 
-    cache.set('state', json.loads({'inv': machine.dump_state}))
     response = {'200': {'status': status, 'progress':progress}}
     return json.dumps(response)
 

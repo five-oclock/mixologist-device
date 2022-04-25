@@ -5,14 +5,13 @@ import json
 format = '[%(asctime)s]: %(message)s'
 
 class Mixologist():
-    def __init__(self, num_res, num_loc, cache, max=60, units='oz'):
+    def __init__(self, num_res, num_loc, max=60, units='oz'):
         self.max = max
         self.num_res = num_res
         self.res_pool = [Reservoir(i, max, units) for i in range(num_res)]
         self.num_loc = num_loc
         self.loc_pool = [Location() for _ in range(num_loc)]
         self.drinks_in_progress = 0
-        self.cache = cache
     
     def add_drink(self):
         if self.drinks_in_progress >= self.num_loc:
@@ -20,7 +19,6 @@ class Mixologist():
 
         for i in range(self.num_loc):
             if self.loc_pool[i].get_occupied() == False:
-                self.cache.set('loc' + str(i), 1)
                 self.loc_pool[i].set_occupied(True)
                 self.drinks_in_progress += 1
                 return i
@@ -32,7 +30,6 @@ class Mixologist():
             #return -1
 
         #self.loc_pool[loc].set_occupied(False)
-        #self.cache.set('loc' + str(loc), 0)
         #self.drinks_in_progress -= 1
 
         #return 0
