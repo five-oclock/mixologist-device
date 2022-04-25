@@ -58,8 +58,22 @@ class Mixologist():
     def get_loc(self, loc):
         return self.loc_pool[loc]
 
-    def dump_state():
-        pass
+    def dump_state(self):
+        inv = list()
+
+        for i in range(self.num_res):
+            data = {
+                "reservoir": i,
+                "ingredient-id": self.get_res(i).ingredient, 
+                "quantity": self.get_res(i).quantity,
+                "units": self.get_res(i).units
+                }
+            inv.append(data)
+
+        return inv
+
+    def change_ingredient(self, res, id):
+        self.get_res(res).set_properties(id, self.max)
 
 class Reservoir():
     def __init__(self, id, max, units):
@@ -111,7 +125,6 @@ class Location():
 
     def clear_thread(self):
        self.thread = None
-       t.start() 
 
 class Job(Thread):
     def __init__(self, loc, duration, app):
