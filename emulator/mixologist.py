@@ -1,18 +1,16 @@
 from threading import Thread
 import time
-import json
 
 format = '[%(asctime)s]: %(message)s'
 
 class Mixologist():
-    def __init__(self, num_res, num_loc, cache, max=60, units='oz'):
+    def __init__(self, num_res, num_loc, max=60, units='oz'):
         self.max = max
         self.num_res = num_res
         self.res_pool = [Reservoir(i, max, units) for i in range(num_res)]
         self.num_loc = num_loc
         self.loc_pool = [Location() for _ in range(num_loc)]
         self.drinks_in_progress = 0
-        self.cache = cache
     
     def add_drink(self):
         if self.drinks_in_progress >= self.num_loc:
@@ -20,22 +18,20 @@ class Mixologist():
 
         for i in range(self.num_loc):
             if self.loc_pool[i].get_occupied() == False:
-                self.cache.set('loc' + str(i), 1)
                 self.loc_pool[i].set_occupied(True)
                 self.drinks_in_progress += 1
                 return i
     
         return -1
 
-    #def remove_drink(self, loc):
-        #if not 0 <= loc < self.num_loc:
-            #return -1
+    def remove_drink(self, loc):
+        if not 0 <= loc < self.num_loc:
+            return -1
 
-        #self.loc_pool[loc].set_occupied(False)
-        #self.cache.set('loc' + str(loc), 0)
-        #self.drinks_in_progress -= 1
+        self.loc_pool[loc].set_occupied(False)
+        self.drinks_in_progress -= 1
 
-        #return 0
+        return 0
 
     def set_res_properties(self, res, ingredient, quantity):
         self.get_res(res).set_properties(ingredient, quantity)
@@ -71,9 +67,12 @@ class Mixologist():
             inv.append(data)
 
         return inv
+    
+    def overwrite_state(self, data):
+        data = data['inv']
 
-    def change_ingredient(self, res, id):
-        self.get_res(res).set_properties(id, self.max)
+        for i in range(len(data)):
+            self.set_res_properties(i, int(data[i]['ingredient-id']), int(data[i]['quantity']))
 
 class Reservoir():
     def __init__(self, id, max, units):

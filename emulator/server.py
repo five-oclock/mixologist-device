@@ -4,13 +4,14 @@ from mixologist import Mixologist, Job
 import click
 import logging
 import json
+import requests
 
 app = Flask(__name__)
 
 
 cache = base.Client(('localhost', 11211))
 
-machine = Mixologist(12, 12, cache)
+machine = Mixologist(12, 12)
 
 format = "[%(asctime)s]: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO, datefmt='%H:%M:%S')
@@ -27,23 +28,61 @@ def list_locations():
 @click.argument("res")
 @click.argument("amount")
 def fill_reservoir(res, amount):
+    res = int(res)
+    amount = int(amount)
     if not 0 <= res < machine.num_res:
         logging.info("No valid reservoir with id %s", res)
     else:
-        if machine.get_res(res).quantity + amount > machine.max:
-            amount = machine.max - machine.get_res(res).quantity
-        
-        machine.fill(res, amount)
-        logging.info("Filled reservoir %s with %s ozs", res, amount)
+        state = json.loads(cache.get('state').decode('utf-8'))
+        if state['inv'][res]['quantity'] + amount > machine.max:
+            amount = machine.max - state['inv'][res]['quantity'] 
+
+        state['inv'][res]['quantity'] += amount
+        cache.set('state', json.dumps(state))
+        logging.info("Queued fill at reservoir %s with %s ozs", res, amount)
 
 @app.cli.command('change')
 @click.argument("res")
 @click.argument("ingredient")
-def change_liqure(res, ingredient):
+@click.argument("amount")
+def change_liqure(res, ingredient, amount):
+    res = int(res)
+    ingredient = int(ingredient)
+    amount = int(amount)
+
     if not 0 <= res < machine.num_res:
         logging.info("No valid reservoir with id %s", res)
     else:
-        machine.change_ingredient(res, ingredient)
+        state = json.loads(cache.get('state').decode('utf-8'))
+        if amount > machine.max:
+            amount = machine.max
+
+        state['inv'][res]['ingredient-id'] = ingredient
+        state['inv'][res]['quantity'] = amount
+        cache.set('state', json.dumps(state))
+        logging.info("Queued liqure change at reservoir %s with %s ozs", res, amount)
+        
+@app.cli.command('remove')
+@click.argument('loc')
+def remove_drink(loc):
+    loc = int(loc)
+
+    if not 0 <= loc < machine.num_loc:
+        logging.info("No valid location with id %s", loc)
+    else:
+        p = {'Location Number': loc}
+        res = requests.get('http://127.0.0.1:5000/api/v1/location', params=p)
+        data = res.json()
+
+        if data['200']['status'] == 'making':
+            logging.info("Drink at location %s is in progress, cannot remove", loc)
+        else:
+            if cache.get('loc' + str(loc)).decode('utf-8') == '1':
+                cache.set('remove_flag', 1)
+                cache.set('remove_loc', loc)
+                logging.info("Queued drink removal at location %s", loc)
+            else:
+                logging.info("No drink to remove at location %s", loc)
 
 
 ############################################################################
@@ -57,7 +96,42 @@ def startup():
     for i in range(machine.num_res):
         machine.set_res_properties(i, i, machine.max)
     
-    cache.set('state', json.loads({inv: machine.dump_state}))
+    state = machine.dump_state()
+    cache.set('state', json.dumps({'inv': state}))
+    cache.set('remove_flag', 0)
+
+
+@app.before_request
+def sync_cache():
+    def ordered(obj):
+        if isinstance(obj, dict):
+            return sorted((k, ordered(v)) for k, v in obj.items())
+        if isinstance(obj, list):
+            return sorted(ordered(x) for x in obj)
+        else:
+            return obj
+
+    a = json.loads(cache.get('state').decode('utf-8'))
+
+    state = machine.dump_state()
+    b = {'inv': state}
+
+    if(ordered(a) != ordered(b)):
+        app.logger.info('Cache out of sync')
+        c_data = json.loads(cache.get('state').decode('utf-8'))
+        machine.overwrite_state(c_data)
+    
+    if int(cache.get('remove_flag').decode('utf-8')) == 1:
+        loc = int(cache.get('remove_loc').decode('utf-8'))
+        machine.remove_drink(loc)
+        cache.set('remove_flag', 0)
+
+@app.after_request
+def update_cache(response):
+    state = machine.dump_state()
+    cache.set('state', json.dumps({'inv': state}))
+    return response
+
 
 @app.route('/api/v1/make-recipe', methods = ['POST'])
 def app_make_drink():
@@ -66,9 +140,10 @@ def app_make_drink():
     app.logger.info('Drink request received from user %s', user)
 
     loc = machine.add_drink()
+    cache.set('loc' + str(loc), 1)
 
     if loc == -1:
-        return json.dumps({'location': -1})
+        return {'location': -1}
     
     recipe = req['recipe']
 
@@ -76,26 +151,23 @@ def app_make_drink():
     for r in recipe:
         exists = False
         for i in range(machine.num_res):
-            if machine.get_res(i).ingredient == r['ingredient-id']:
-                if machine.get_res(i).quantity >= r['amount']:
+            if machine.get_res(i).ingredient == int(r['ingredient-id']):
+                if machine.get_res(i).quantity >= int(r['amount']):
                     exists = True
         all_ingredients = all_ingredients and exists
 
     if not all_ingredients:
-        print(machine.dump_state())
-        return json.dumps({'location': -2})
+        return {'location': -2}
 
     for r in recipe:
         for i in range(machine.num_res):
-            if machine.get_res(i).ingredient == r['ingredient-id']:
-                machine.pour(i, r['amount'])
+            if machine.get_res(i).ingredient == int(r['ingredient-id']):
+                machine.pour(i, int(r['amount']))
 
     machine.set_thread(loc, Job(loc, 20, app))
-    state = machine.dump_state()
-    cache.set('state', json.dumps({'inv': state}))
 
-    response = {'200': {'location': 0}}
-    return json.dumps(response)
+    response = {'200': {'location': loc}}
+    return response
 
 @app.route('/api/v1/location', methods = ['GET'])
 def app_get_status():
@@ -105,7 +177,7 @@ def app_get_status():
 
     if not 0 <= loc < machine.num_loc:
         response = {'status': status, 'progress':progress}
-        return json.dumps(response)
+        return response
 
 
     if machine.get_thread(loc) != None and machine.get_thread(loc).is_alive():
@@ -117,13 +189,12 @@ def app_get_status():
     else:
         status = 'open'
 
-    cache.set('state', json.loads({'inv': machine.dump_state}))
     response = {'200': {'status': status, 'progress':progress}}
-    return json.dumps(response)
+    return response
 
 @app.route('/api/v1/inventory', methods = ['GET'])
 def app_get_inventory():
     inv = machine.dump_state()
 
     response = {'inventory': inv}
-    return json.dumps(response)
+    return response
